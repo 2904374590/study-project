@@ -2,24 +2,35 @@ package com.example.config;
 
 import com.alibaba.fastjson.JSONObject;
 import com.example.entity.RestBean;
+import com.example.service.AuthorizeService;
+import jakarta.annotation.Resource;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.io.IOException;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfiguration {
-    @SneakyThrows
+
+    @Resource
+    AuthorizeService authorizeService;
+
     @Bean
     //过滤链
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -46,6 +57,9 @@ public class SecurityConfiguration {
                 //配置CSRF保护
                 .csrf()
                 .disable()
+                .cors()
+                .configurationSource(this.corsConfigurationSource())
+                .and()
                 .exceptionHandling()
                 .authenticationEntryPoint(this::onAuthenticationFailure)
                 .and()
@@ -53,14 +67,41 @@ public class SecurityConfiguration {
                 .build();
     }
 
+    private CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cors = new CorsConfiguration();
+        cors.addAllowedOriginPattern("*");
+        cors.addAllowedHeader("*");
+        cors.addAllowedMethod("*");
+        cors.setAllowCredentials(true);
+        cors.addExposedHeader("*");
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cors);
+        return source;
+    }
+
+
+    @Bean
+    public AuthenticationManager authenticationManager(HttpSecurity security) throws Exception {
+        return security
+                .getSharedObject(AuthenticationManagerBuilder.class)
+                .userDetailsService(authorizeService)
+                .and()
+                .build();
+    }
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder(){
+        return new BCryptPasswordEncoder();
+    }
+
+
     private void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, org.springframework.security.core.Authentication authentication) throws IOException {
         response.setCharacterEncoding("utf-8");
         response.getWriter().write(JSONObject.toJSONString(RestBean.success("登陆成功!")));
     }
 
-    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
+    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException{
         response.setCharacterEncoding("utf-8");
-        response.getWriter().write(JSONObject.toJSONString(RestBean.failure(401,exception.getMessage())));
+        response.getWriter().write(JSONObject.toJSONString(RestBean.failure(401,"失败")));
     }
 
 
