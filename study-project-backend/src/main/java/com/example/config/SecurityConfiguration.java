@@ -18,10 +18,13 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl;
+import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 
 @Configuration
@@ -31,9 +34,13 @@ public class SecurityConfiguration {
     @Resource
     AuthorizeService authorizeService;
 
+    @Resource
+    DataSource dataSource;
+
     @Bean
     //过滤链
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           PersistentTokenRepository repository) throws Exception {
         return http
                 //配置请求授权规则
                 .authorizeHttpRequests()
@@ -53,6 +60,13 @@ public class SecurityConfiguration {
                 .logout()
                 //处理注销请求的URL
                 .logoutUrl("/api/auth/logout")
+                .logoutSuccessHandler(this::onAuthenticationSuccess)
+                .and()
+                //记住我功能
+                .rememberMe()
+                .rememberMeParameter("remember")
+                .tokenRepository(repository)
+                .tokenValiditySeconds(3600 * 24 * 7)
                 .and()
                 //配置CSRF保护
                 .csrf()
@@ -66,7 +80,19 @@ public class SecurityConfiguration {
                 //构建并返回SecurityFilterChain
                 .build();
     }
+//    记住，关于创业，你的人生中可以失去很多次机会，但是只要抓住其中一次，那你的人生就可以逆转！
+//    管理持久化令牌---记住我功能
+    @Bean
+    public PersistentTokenRepository tokenRepository(){
+        JdbcTokenRepositoryImpl  jdbcTokenRepositoryImpl = new  JdbcTokenRepositoryImpl();
+        jdbcTokenRepositoryImpl.setDataSource(dataSource);
+        //设置是否在启动时创建表
+        jdbcTokenRepositoryImpl.setCreateTableOnStartup(false);
+        return jdbcTokenRepositoryImpl;
+    }
 
+
+    //跨域配置
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cors = new CorsConfiguration();
         cors.addAllowedOriginPattern("*");
@@ -96,12 +122,18 @@ public class SecurityConfiguration {
 
     private void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, org.springframework.security.core.Authentication authentication) throws IOException {
         response.setCharacterEncoding("utf-8");
-        response.getWriter().write(JSONObject.toJSONString(RestBean.success("登陆成功!")));
+        if (request.getRequestURL().toString().endsWith("/login"))
+            response.getWriter().write(JSONObject.toJSONString(RestBean.success("登陆成功!")));
+        else if (request.getRequestURL().toString().endsWith("/logout"))
+            response.getWriter().write(JSONObject.toJSONString(RestBean.success("退出登录成功")));
     }
 
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException{
         response.setCharacterEncoding("utf-8");
-        response.getWriter().write(JSONObject.toJSONString(RestBean.failure(401,"失败")));
+        if (request.getRequestURI().endsWith("/login"))
+           response.getWriter().write(JSONObject.toJSONString(RestBean.failure(401,"失败")));
+        else if (request.getRequestURI().endsWith("/logout"))
+           response.getWriter().write(JSONObject.toJSONString(RestBean.success("退出登录成功!")));
     }
 
 
