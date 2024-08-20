@@ -4,6 +4,8 @@ import {Lock, User,Message} from "@element-plus/icons-vue";
 import router from "@/router/index.js";
 import { reactive } from 'vue';
 import { ref } from 'vue';
+import {ElMessage} from "element-plus";
+import {post} from "@/net/index.js";
 const  form = reactive({
     username: '',
     password: '',
@@ -45,12 +47,32 @@ const rules = {
   email:[
     { required: true, message: '请输入电子邮件', trigger: 'blur' },
     {type: 'email', message: '请输入合法的邮件地址！', trigger: ['blur', 'change'],},
+  ],
+  code:[
+    { required: true, message: '请输入验证码', trigger: 'blur' },
   ]
 }
+const formRef = ref()
 const isEmailValid = ref(false)
 const onValidate = (prop,isValid) =>{
   if (prop === 'email')
     isEmailValid.value = isValid
+}
+const register = () => {
+    formRef.value.validate((isValid) => {
+      if (isValid){
+      //   发送请求
+      }else {
+        ElMessage.warning("完整填写注册表单内容")
+      }
+    })
+}
+const validateEmail = () => {
+  post('/api/auth/valid-email',{
+    email: form.email
+  },(message) =>{
+    ElMessage.success(message)
+  })
 }
 </script>
 
@@ -61,50 +83,50 @@ const onValidate = (prop,isValid) =>{
             <div style="font-size: 14px;color: gray">欢迎注册我们的学习平台，请在下方填写相关信息！</div>
           </div>
           <div style="margin-top: 50px">
-            <el-form :model="form"  :rules="rules" @validate="onValidate">
+            <el-form :model="form"  :rules="rules" @validate="onValidate" ref="formRef">
               <el-form-item prop="username">
-                <el-input   v-model="form.username"  type="text" placeholder="用户名" >
+                <el-input :maxlength="8"   v-model="form.username"  type="text" placeholder="用户名" >
                   <template #prefix>
                     <el-icon><User /></el-icon>
                   </template>
                 </el-input>
               </el-form-item>
               <el-form-item prop="password">
-                <el-input v-model="form.password" type="password" placeholder="密码" >
+                <el-input :maxlength="16" v-model="form.password" type="password" placeholder="密码" >
                   <template #prefix>
                     <el-icon><Lock /></el-icon>
                   </template>
                 </el-input>
               </el-form-item>
               <el-form-item prop="password_repeat">
-                <el-input v-model="form.password_repeat" type="password" placeholder="重复密码" >
+                <el-input :maxlength="16" v-model="form.password_repeat" type="password" placeholder="重复密码" >
                   <template #prefix>
                     <el-icon><Lock /></el-icon>
                   </template>
                 </el-input>
               </el-form-item>
               <el-form-item prop="email">
-                <el-input v-model="form.email"  type="email" placeholder="电子邮件地址" >
+                <el-input  v-model="form.email"  type="email" placeholder="电子邮件地址" >
                   <template  #prefix>
                     <el-icon><Message /></el-icon>
                   </template>
                 </el-input>
               </el-form-item>
-              <el-form-item>
+              <el-form-item prop="code">
                 <el-row :gutter="10" style="width: 100%">
                   <el-col :span="17">
-                    <el-input v-model="form.code" type="text" placeholder="请输入验证码">
+                    <el-input :maxlength="6" v-model="form.code" type="text" placeholder="请输入验证码">
                     </el-input>
                   </el-col>
                   <el-col :span="5">
-                    <el-button  type="success" :disabled="!isEmailValid">获取验证码</el-button>
+                    <el-button  type="success" @click="validateEmail" :disabled="!isEmailValid">获取验证码</el-button>
                   </el-col>
                 </el-row>
               </el-form-item>
             </el-form>
           </div>
           <div style="margin-top: 80px">
-              <el-button style="width: 270px" type="warning" plain>立即注册</el-button>
+              <el-button style="width: 270px" type="warning" @click="register" plain>立即注册</el-button>
           </div>
           <div style="margin-top: 20px;">
             <span style="margin-top: 20px;font-size: 14px;line-height: 15px;color: gray">已有帐号？</span>
